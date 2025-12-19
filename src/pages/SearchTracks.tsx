@@ -35,7 +35,8 @@ export default function SearchTracks() {
   const [isFeaturedLoading, setIsFeaturedLoading] = useState(true);
   const [hasSearched, setHasSearched] = useState(false);
   const [selectedTrack, setSelectedTrack] = useState<TrackMetadata | null>(null);
-  const [source, setSource] = useState<SourceType>('podcastindex');
+  // Default to mock data since Podcast Index requires a backend proxy for CORS
+  const [source, setSource] = useState<SourceType>('mock');
   const [error, setError] = useState<string | null>(null);
 
   // Load featured tracks on mount
@@ -67,7 +68,7 @@ export default function SearchTracks() {
     setIsSearching(true);
     setHasSearched(true);
     setError(null);
-    
+
     try {
       const musicSource = source === 'podcastindex' ? podcastIndexSource : mockMusicSource;
       const searchResults = await musicSource.search(query);
@@ -160,12 +161,12 @@ export default function SearchTracks() {
                 )}
               </Button>
             </div>
-            
+
             {/* Source toggle */}
             <div className="flex items-center justify-between mt-4 pt-4 border-t">
               <div className="flex items-center gap-2">
                 <span className="text-sm text-muted-foreground">Source:</span>
-                <Badge 
+                <Badge
                   variant={source === 'podcastindex' ? 'default' : 'secondary'}
                   className="cursor-pointer"
                   onClick={toggleSource}
@@ -243,7 +244,7 @@ export default function SearchTracks() {
               <Sparkles className="w-5 h-5 text-amber-500" />
               {source === 'podcastindex' ? 'Recent V4V Music' : 'Featured Tracks'}
             </h2>
-            
+
             {isFeaturedLoading && (
               <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 {[1, 2, 3, 4, 5, 6].map((i) => (

@@ -37,7 +37,7 @@ export default function AddTrackToList() {
   const navigate = useNavigate();
   const { user } = useCurrentUser();
   const { toast } = useToast();
-  
+
   const { data: list, isLoading: listLoading } = useMusicList(listId);
   const { mutateAsync: addTrack, isPending: isAdding } = useAddTrackToList();
 
@@ -47,9 +47,10 @@ export default function AddTrackToList() {
   const [isSearching, setIsSearching] = useState(false);
   const [isFeaturedLoading, setIsFeaturedLoading] = useState(true);
   const [hasSearched, setHasSearched] = useState(false);
-  const [source, setSource] = useState<SourceType>('podcastindex');
+  // Default to mock data since Podcast Index requires a backend proxy for CORS
+  const [source, setSource] = useState<SourceType>('mock');
   const [error, setError] = useState<string | null>(null);
-  
+
   // Dialog state
   const [selectedTrack, setSelectedTrack] = useState<TrackMetadata | null>(null);
   const [annotation, setAnnotation] = useState('');
@@ -89,7 +90,7 @@ export default function AddTrackToList() {
     setIsSearching(true);
     setHasSearched(true);
     setError(null);
-    
+
     try {
       const musicSource = source === 'podcastindex' ? podcastIndexSource : mockMusicSource;
       const searchResults = await musicSource.search(query);
@@ -124,7 +125,7 @@ export default function AddTrackToList() {
       setAddedTracks(prev => new Set(prev).add(selectedTrack.id));
       setSelectedTrack(null);
       setAnnotation('');
-      
+
       toast({
         title: 'Track added!',
         description: `"${selectedTrack.title}" has been added to ${list?.title}`,
@@ -215,8 +216,8 @@ export default function AddTrackToList() {
     <Layout>
       <div className="container py-8">
         {/* Back button */}
-        <Link 
-          to={`/list/${listId}`} 
+        <Link
+          to={`/list/${listId}`}
           className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground mb-6"
         >
           <ArrowLeft className="w-4 h-4" />
@@ -253,12 +254,12 @@ export default function AddTrackToList() {
                 )}
               </Button>
             </div>
-            
+
             {/* Source toggle */}
             <div className="flex items-center justify-between mt-4 pt-4 border-t">
               <div className="flex items-center gap-2">
                 <span className="text-sm text-muted-foreground">Source:</span>
-                <Badge 
+                <Badge
                   variant={source === 'podcastindex' ? 'default' : 'secondary'}
                   className="cursor-pointer"
                   onClick={toggleSource}
@@ -314,7 +315,7 @@ export default function AddTrackToList() {
                 {hasSearched ? 'No results found' : 'No tracks available'}
               </h3>
               <p className="text-muted-foreground text-sm mb-4">
-                {hasSearched 
+                {hasSearched
                   ? 'Try a different search term or switch sources'
                   : 'Try searching for something specific'}
               </p>
@@ -330,10 +331,10 @@ export default function AddTrackToList() {
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {displayTracks.map((track) => {
               const isAdded = addedTracks.has(track.id);
-              
+
               return (
-                <Card 
-                  key={track.id} 
+                <Card
+                  key={track.id}
                   className={`group overflow-hidden transition-all hover:shadow-lg cursor-pointer ${isAdded ? 'ring-2 ring-green-500' : ''}`}
                   onClick={() => !isAdded && handleSelectTrack(track)}
                 >
@@ -348,7 +349,7 @@ export default function AddTrackToList() {
                     ) : (
                       <div className="w-full h-full bg-gradient-to-br from-violet-500 to-fuchsia-500" />
                     )}
-                    
+
                     {/* Overlay */}
                     <div className={`absolute inset-0 flex items-center justify-center bg-black/40 transition-opacity ${isAdded ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
                       {isAdded ? (
@@ -397,8 +398,8 @@ export default function AddTrackToList() {
                 {/* Track preview */}
                 <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
                   {selectedTrack.artworkUrl ? (
-                    <img 
-                      src={selectedTrack.artworkUrl} 
+                    <img
+                      src={selectedTrack.artworkUrl}
                       alt={selectedTrack.title}
                       className="w-12 h-12 rounded object-cover"
                     />
