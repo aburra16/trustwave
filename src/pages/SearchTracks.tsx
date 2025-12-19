@@ -2,20 +2,24 @@
  * Search tracks page - Curator tool for finding music to add to lists
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useSeoMeta } from '@unhead/react';
 import { Link } from 'react-router-dom';
-import { Search, Radio, ArrowLeft, Music, Sparkles, Loader2 } from 'lucide-react';
+import { Search, Radio, ArrowLeft, Music, Sparkles, Loader2, RefreshCw } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
 import { Layout } from '@/components/Layout';
 import { TrackCard } from '@/components/TrackCard';
 import { AddToListDialog } from '@/components/AddToListDialog';
-import { mockMusicSource, mockTracks } from '@/lib/mockMusicData';
+import { podcastIndexSource } from '@/lib/podcastIndex';
+import { mockMusicSource } from '@/lib/mockMusicData';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import type { TrackMetadata } from '@/lib/musicTypes';
+
+type SourceType = 'podcastindex' | 'mock';
 
 export default function SearchTracks() {
   useSeoMeta({
@@ -26,22 +30,55 @@ export default function SearchTracks() {
   const { user } = useCurrentUser();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<TrackMetadata[]>([]);
-  const [featured, setFeatured] = useState<TrackMetadata[]>(mockTracks.slice(0, 6));
+  const [featured, setFeatured] = useState<TrackMetadata[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [isFeaturedLoading, setIsFeaturedLoading] = useState(true);
   const [hasSearched, setHasSearched] = useState(false);
   const [selectedTrack, setSelectedTrack] = useState<TrackMetadata | null>(null);
+  const [source, setSource] = useState<SourceType>('podcastindex');
+  const [error, setError] = useState<string | null>(null);
+
+  // Load featured tracks on mount
+  useEffect(() => {
+    loadFeatured();
+  }, [source]);
+
+  const loadFeatured = async () => {
+    setIsFeaturedLoading(true);
+    setError(null);
+    try {
+      const musicSource = source === 'podcastindex' ? podcastIndexSource : mockMusicSource;
+      const tracks = await musicSource.getFeatured?.() || [];
+      setFeatured(tracks);
+      if (tracks.length === 0 && source === 'podcastindex') {
+        setError('Could not load from Podcast Index. Try the mock data source.');
+      }
+    } catch (err) {
+      console.error('Error loading featured:', err);
+      setError('Failed to load featured tracks. Try switching to mock data.');
+    } finally {
+      setIsFeaturedLoading(false);
+    }
+  };
 
   const handleSearch = async () => {
     if (!query.trim()) return;
 
     setIsSearching(true);
     setHasSearched(true);
+    setError(null);
     
     try {
-      const searchResults = await mockMusicSource.search(query);
+      const musicSource = source === 'podcastindex' ? podcastIndexSource : mockMusicSource;
+      const searchResults = await musicSource.search(query);
       setResults(searchResults);
-    } catch (error) {
-      console.error('Search error:', error);
+      if (searchResults.length === 0) {
+        setError('No results found. Try a different search term or switch sources.');
+      }
+    } catch (err) {
+      console.error('Search error:', err);
+      setError('Search failed. Please try again.');
+      setResults([]);
     } finally {
       setIsSearching(false);
     }
@@ -49,6 +86,14 @@ export default function SearchTracks() {
 
   const handleAddToList = (track: TrackMetadata) => {
     setSelectedTrack(track);
+  };
+
+  const toggleSource = () => {
+    const newSource = source === 'podcastindex' ? 'mock' : 'podcastindex';
+    setSource(newSource);
+    setResults([]);
+    setHasSearched(false);
+    setError(null);
   };
 
   if (!user) {
@@ -89,7 +134,7 @@ export default function SearchTracks() {
             Find Tracks
           </h1>
           <p className="text-muted-foreground">
-            Search for music and add it to your playlists
+            Search for V4V music and add it to your playlists
           </p>
         </div>
 
@@ -100,7 +145,7 @@ export default function SearchTracks() {
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search by artist, track name, or album..."
+                  placeholder="Search by artist, track name, or genre..."
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
@@ -115,11 +160,35 @@ export default function SearchTracks() {
                 )}
               </Button>
             </div>
-            <p className="text-xs text-muted-foreground mt-2">
-              Currently using mock data. Podcast Index integration coming soon!
-            </p>
+            
+            {/* Source toggle */}
+            <div className="flex items-center justify-between mt-4 pt-4 border-t">
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">Source:</span>
+                <Badge 
+                  variant={source === 'podcastindex' ? 'default' : 'secondary'}
+                  className="cursor-pointer"
+                  onClick={toggleSource}
+                >
+                  {source === 'podcastindex' ? '🎙️ Podcast Index' : '🎵 Mock Data'}
+                </Badge>
+              </div>
+              <Button variant="ghost" size="sm" onClick={loadFeatured} disabled={isFeaturedLoading}>
+                <RefreshCw className={`w-4 h-4 mr-2 ${isFeaturedLoading ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
+            </div>
           </CardContent>
         </Card>
+
+        {/* Error message */}
+        {error && (
+          <Card className="mb-6 border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30">
+            <CardContent className="py-4">
+              <p className="text-sm text-amber-800 dark:text-amber-200">{error}</p>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Search results */}
         {isSearching && (
@@ -136,7 +205,7 @@ export default function SearchTracks() {
           </div>
         )}
 
-        {!isSearching && hasSearched && results.length === 0 && (
+        {!isSearching && hasSearched && results.length === 0 && !error && (
           <Card className="border-dashed">
             <CardContent className="py-12 text-center">
               <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
@@ -144,7 +213,7 @@ export default function SearchTracks() {
               </div>
               <h3 className="font-semibold text-lg mb-2">No results found</h3>
               <p className="text-muted-foreground text-sm">
-                Try a different search term
+                Try a different search term or switch to {source === 'podcastindex' ? 'mock data' : 'Podcast Index'}
               </p>
             </CardContent>
           </Card>
@@ -172,17 +241,51 @@ export default function SearchTracks() {
           <div>
             <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
               <Sparkles className="w-5 h-5 text-amber-500" />
-              Featured Tracks
+              {source === 'podcastindex' ? 'Recent V4V Music' : 'Featured Tracks'}
             </h2>
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {featured.map((track) => (
-                <TrackCard
-                  key={track.id}
-                  track={track}
-                  onAddToList={() => handleAddToList(track)}
-                />
-              ))}
-            </div>
+            
+            {isFeaturedLoading && (
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {[1, 2, 3, 4, 5, 6].map((i) => (
+                  <Card key={i}>
+                    <Skeleton className="aspect-square" />
+                    <CardContent className="p-4 space-y-2">
+                      <Skeleton className="h-5 w-3/4" />
+                      <Skeleton className="h-4 w-1/2" />
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+
+            {!isFeaturedLoading && featured.length > 0 && (
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {featured.map((track) => (
+                  <TrackCard
+                    key={track.id}
+                    track={track}
+                    onAddToList={() => handleAddToList(track)}
+                  />
+                ))}
+              </div>
+            )}
+
+            {!isFeaturedLoading && featured.length === 0 && !error && (
+              <Card className="border-dashed">
+                <CardContent className="py-12 text-center">
+                  <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
+                    <Music className="w-8 h-8 text-muted-foreground" />
+                  </div>
+                  <h3 className="font-semibold text-lg mb-2">No tracks available</h3>
+                  <p className="text-muted-foreground text-sm mb-4">
+                    Try searching for something specific or switch sources
+                  </p>
+                  <Button variant="outline" onClick={toggleSource}>
+                    Switch to {source === 'podcastindex' ? 'Mock Data' : 'Podcast Index'}
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
           </div>
         )}
 
