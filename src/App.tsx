@@ -33,7 +33,7 @@ const queryClient = new QueryClient({
 });
 
 const defaultConfig: AppConfig = {
-  theme: "light",
+  theme: "dark",
   relayMetadata: {
     relays: [
       { url: 'wss://dcosl.brainstorm.world', read: true, write: true },
