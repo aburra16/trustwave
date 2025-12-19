@@ -163,21 +163,28 @@ export default function SearchTracks() {
             </div>
 
             {/* Source toggle */}
-            <div className="flex items-center justify-between mt-4 pt-4 border-t">
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">Source:</span>
-                <Badge
-                  variant={source === 'podcastindex' ? 'default' : 'secondary'}
-                  className="cursor-pointer"
-                  onClick={toggleSource}
-                >
-                  {source === 'podcastindex' ? '🎙️ Podcast Index' : '🎵 Mock Data'}
-                </Badge>
+            <div className="flex flex-col gap-2 mt-4 pt-4 border-t">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">Source:</span>
+                  <Badge
+                    variant={source === 'podcastindex' ? 'default' : 'secondary'}
+                    className="cursor-pointer"
+                    onClick={toggleSource}
+                  >
+                    {source === 'podcastindex' ? '🎙️ Podcast Index' : '🎵 Mock Data'}
+                  </Badge>
+                </div>
+                <Button variant="ghost" size="sm" onClick={loadFeatured} disabled={isFeaturedLoading}>
+                  <RefreshCw className={`w-4 h-4 mr-2 ${isFeaturedLoading ? 'animate-spin' : ''}`} />
+                  Refresh
+                </Button>
               </div>
-              <Button variant="ghost" size="sm" onClick={loadFeatured} disabled={isFeaturedLoading}>
-                <RefreshCw className={`w-4 h-4 mr-2 ${isFeaturedLoading ? 'animate-spin' : ''}`} />
-                Refresh
-              </Button>
+              {source === 'podcastindex' && (
+                <p className="text-xs text-amber-600 dark:text-amber-400">
+                  ⚠️ Podcast Index requires a backend proxy due to CORS. Using mock data for now.
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>
