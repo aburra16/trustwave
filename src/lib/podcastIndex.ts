@@ -2,16 +2,15 @@
  * Podcast Index API integration
  * https://podcastindex-org.github.io/docs-api/
  * 
- * Note: The API requires both an API Key and API Secret for authentication.
- * The secret is used to generate an Authorization header hash.
+ * The API requires both an API Key and API Secret for authentication.
+ * Authorization = sha1(apiKey + apiSecret + unixTime)
  */
 
 import type { TrackMetadata, ValueTag, MusicSourceProvider } from './musicTypes';
 
 const API_BASE = 'https://api.podcastindex.org/api/1.0';
-const API_KEY = 'DEVNGYRZ4D4R8KF2BNHB';
-// Note: API Secret should be kept secure. For production, this should be handled server-side.
-// For now, we'll need to use the CORS proxy and handle auth differently or use search endpoints that don't require auth.
+const API_KEY = 'QR3MNNMGKTRHXAD9NKBL';
+const API_SECRET = '#$LTq8HngFFLZ8bRMqU^wSukj5E6tEPe$RKbsaRR';
 
 const CORS_PROXY = 'https://proxy.shakespeare.diy/?url=';
 
@@ -83,11 +82,12 @@ interface PodcastIndexMusicResponse {
 
 /**
  * Generate auth headers for Podcast Index API
- * The API requires: X-Auth-Date, X-Auth-Key, and Authorization (sha1 hash)
+ * The API requires: X-Auth-Date, X-Auth-Key, and Authorization (sha1 hash of key+secret+time)
  */
 async function generateAuthHeaders(): Promise<Record<string, string>> {
   const apiHeaderTime = Math.floor(Date.now() / 1000);
-  const data4Hash = API_KEY + apiHeaderTime;
+  // The hash must be: sha1(apiKey + apiSecret + unixTime)
+  const data4Hash = API_KEY + API_SECRET + apiHeaderTime;
   
   // Generate SHA-1 hash
   const encoder = new TextEncoder();
