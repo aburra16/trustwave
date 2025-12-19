@@ -35,9 +35,52 @@ The app includes Podcast Index API integration, but due to security requirements
 
 ### Current State
 - **Mock data** is used by default with 10 sample V4V tracks
-- The Podcast Index integration code is ready but requires server-side proxy
+- The Podcast Index integration code is ready and will automatically activate when you deploy the proxy
+- Cloudflare Worker code is included in `/cloudflare-worker/`
 
-### To Enable Podcast Index (Options)
+### Quick Setup (Recommended)
+
+**Step 1**: Deploy the Cloudflare Worker proxy (keeps your API secret secure):
+
+```bash
+# Create the Worker project
+npm create cloudflare@latest trustwave-pi-proxy
+
+# Choose "Hello World Worker" when prompted
+cd trustwave-pi-proxy
+npm install
+
+# Copy the Worker code
+cp ../cloudflare-worker/index.ts src/index.ts
+
+# Add your secrets (NEVER commit these)
+npx wrangler secret put PODCASTINDEX_KEY
+# Enter: QR3MNNMGKTRHXAD9NKBL
+
+npx wrangler secret put PODCASTINDEX_SECRET
+# Enter: #$LTq8HngFFLZ8bRMqU^wSukj5E6tEPe$RKbsaRR
+
+# Deploy
+npm run deploy
+```
+
+**Step 2**: Configure TrustWave to use your proxy:
+
+Create `.env` file in the TrustWave project root:
+
+```env
+VITE_PI_PROXY_URL=https://trustwave-pi-proxy.<your-subdomain>.workers.dev
+```
+
+**Step 3**: Rebuild TrustWave:
+
+```bash
+npm run build
+```
+
+That's it! The app will now use real Podcast Index data.
+
+### Alternative Options
 
 #### Option 1: Serverless Function
 Deploy a serverless function (Cloudflare Worker, Vercel Edge Function, etc.) that:
@@ -51,10 +94,10 @@ export default {
   async fetch(request) {
     const url = new URL(request.url);
     const query = url.searchParams.get('q');
-    
+
     const apiTime = Math.floor(Date.now() / 1000);
     const hash = await sha1(API_KEY + API_SECRET + apiTime);
-    
+
     const response = await fetch(`https://api.podcastindex.org/api/1.0/search/byterm?q=${query}`, {
       headers: {
         'X-Auth-Date': apiTime,
@@ -62,7 +105,7 @@ export default {
         'Authorization': hash
       }
     });
-    
+
     return new Response(await response.text(), {
       headers: { 'Access-Control-Allow-Origin': '*' }
     });
