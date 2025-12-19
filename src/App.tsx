@@ -36,6 +36,7 @@ const defaultConfig: AppConfig = {
   theme: "light",
   relayMetadata: {
     relays: [
+      { url: 'wss://dcosl.brainstorm.world', read: true, write: true },
       { url: 'wss://relay.ditto.pub', read: true, write: true },
       { url: 'wss://relay.nostr.band', read: true, write: true },
       { url: 'wss://relay.damus.io', read: true, write: true },
