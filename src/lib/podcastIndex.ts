@@ -1,10 +1,10 @@
 /**
  * Podcast Index API integration
  * https://podcastindex-org.github.io/docs-api/
- * 
+ *
  * This module uses a Cloudflare Worker proxy to make authenticated requests
  * to the Podcast Index API, solving CORS issues and keeping the API secret secure.
- * 
+ *
  * Setup:
  * 1. Deploy the Cloudflare Worker from /cloudflare-worker/index.ts
  * 2. Set VITE_PI_PROXY_URL in your .env file
@@ -13,11 +13,15 @@
 
 import type { TrackMetadata, ValueTag, MusicSourceProvider } from './musicTypes';
 
-// Get proxy URL from environment variable
-const PROXY_URL = import.meta.env.VITE_PI_PROXY_URL || '';
+// Get proxy URL from environment variable or use hardcoded value
+const PROXY_URL = import.meta.env.VITE_PI_PROXY_URL || 'https://trustwave-pi-proxy.malfactoryst.workers.dev';
 
 // Check if proxy is configured
 const isProxyConfigured = Boolean(PROXY_URL);
+
+// Debug logging
+console.log('Podcast Index proxy URL:', PROXY_URL);
+console.log('Podcast Index available:', isProxyConfigured);
 
 interface PodcastIndexEpisode {
   id: number;
@@ -105,7 +109,7 @@ interface PodcastIndexEpisodesResponse {
  */
 function episodeToTrack(episode: PodcastIndexEpisode): TrackMetadata {
   let valueTag: ValueTag | undefined;
-  
+
   if (episode.value) {
     valueTag = {
       type: episode.value.model.type,
@@ -121,7 +125,7 @@ function episodeToTrack(episode: PodcastIndexEpisode): TrackMetadata {
       })),
     };
   }
-  
+
   return {
     id: String(episode.id),
     title: episode.title,
@@ -145,29 +149,29 @@ export async function searchPodcastIndex(query: string): Promise<TrackMetadata[]
     console.warn('Podcast Index proxy not configured. Set VITE_PI_PROXY_URL in .env');
     return [];
   }
-  
+
   try {
     const encodedQuery = encodeURIComponent(query);
     const response = await fetch(`${PROXY_URL}/search?q=${encodedQuery}&max=20`);
-    
+
     if (!response.ok) {
       const errorText = await response.text();
       console.error('Podcast Index search failed:', response.status, errorText);
       return [];
     }
-    
+
     const data: PodcastIndexSearchResponse = await response.json();
-    
+
     if (data.status !== 'true') {
       console.error('Podcast Index returned error status:', data);
       return [];
     }
-    
+
     // The search/byterm endpoint returns feeds
     if (data.feeds && data.feeds.length > 0) {
       // For each feed, get episodes
       const validFeeds = data.feeds.filter(f => f.episodeCount && f.episodeCount > 0);
-      
+
       // Try to get episodes for the first few feeds
       const tracksPromises = validFeeds.slice(0, 5).map(async (feed) => {
         try {
@@ -187,11 +191,11 @@ export async function searchPodcastIndex(query: string): Promise<TrackMetadata[]
         }
         return [];
       });
-      
+
       const trackArrays = await Promise.all(tracksPromises);
       return trackArrays.flat();
     }
-    
+
     return [];
   } catch (error) {
     console.error('Error searching Podcast Index:', error);
@@ -207,28 +211,28 @@ export async function getRecentMusic(max = 20): Promise<TrackMetadata[]> {
     console.warn('Podcast Index proxy not configured. Set VITE_PI_PROXY_URL in .env');
     return [];
   }
-  
+
   try {
     const response = await fetch(`${PROXY_URL}/recent?max=${max}`);
-    
+
     if (!response.ok) {
       const errorText = await response.text();
       console.error('Podcast Index recent failed:', response.status, errorText);
       return [];
     }
-    
+
     const data: PodcastIndexEpisodesResponse = await response.json();
-    
+
     if (data.status !== 'true' || !data.items) {
       return [];
     }
-    
+
     // Filter to only episodes with valid audio URLs
-    const validEpisodes = data.items.filter(ep => 
-      ep.enclosureUrl && 
+    const validEpisodes = data.items.filter(ep =>
+      ep.enclosureUrl &&
       (ep.enclosureType?.includes('audio') || ep.enclosureUrl.match(/\.(mp3|m4a|ogg|wav)$/i))
     );
-    
+
     return validEpisodes.map(episodeToTrack);
   } catch (error) {
     console.error('Error fetching recent from Podcast Index:', error);
@@ -244,25 +248,25 @@ export async function getEpisodeById(id: string): Promise<TrackMetadata | null> 
     console.warn('Podcast Index proxy not configured. Set VITE_PI_PROXY_URL in .env');
     return null;
   }
-  
+
   try {
     // Handle feed IDs (from search results)
     if (id.startsWith('feed-')) {
       return null;
     }
-    
+
     const response = await fetch(`${PROXY_URL}/episodes/byid?id=${id}`);
-    
+
     if (!response.ok) {
       return null;
     }
-    
+
     const data = await response.json();
-    
+
     if (data.status !== 'true' || !data.episode) {
       return null;
     }
-    
+
     return episodeToTrack(data.episode);
   } catch (error) {
     console.error('Error fetching episode:', error);
@@ -282,15 +286,15 @@ export function isPodcastIndexAvailable(): boolean {
  */
 export const podcastIndexSource: MusicSourceProvider = {
   name: 'Podcast Index',
-  
+
   async search(query: string): Promise<TrackMetadata[]> {
     return searchPodcastIndex(query);
   },
-  
+
   async getTrack(id: string): Promise<TrackMetadata | null> {
     return getEpisodeById(id);
   },
-  
+
   async getFeatured(): Promise<TrackMetadata[]> {
     return getRecentMusic(12);
   },
