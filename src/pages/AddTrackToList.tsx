@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/dialog';
 import { Layout } from '@/components/Layout';
 import { TrackCard } from '@/components/TrackCard';
+import { FeedTrackBrowser } from '@/components/FeedTrackBrowser';
 import { useMusicList } from '@/hooks/useMusicLists';
 import { useAddTrackToList } from '@/hooks/useAddTrackToList';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
@@ -50,6 +51,9 @@ export default function AddTrackToList() {
   // Default to mock data since Podcast Index requires a backend proxy for CORS
   const [source, setSource] = useState<SourceType>('mock');
   const [error, setError] = useState<string | null>(null);
+
+  // Feed browsing state
+  const [browseFeed, setBrowseFeed] = useState<TrackMetadata | null>(null);
 
   // Dialog state
   const [selectedTrack, setSelectedTrack] = useState<TrackMetadata | null>(null);
@@ -107,9 +111,17 @@ export default function AddTrackToList() {
     }
   };
 
+  const handleBrowseFeed = (feed: TrackMetadata) => {
+    setBrowseFeed(feed);
+  };
+
   const handleSelectTrack = (track: TrackMetadata) => {
     setSelectedTrack(track);
     setAnnotation('');
+  };
+
+  const handleBackFromBrowser = () => {
+    setBrowseFeed(null);
   };
 
   const handleAddTrack = async () => {
@@ -323,66 +335,74 @@ export default function AddTrackToList() {
           </Card>
         )}
 
-        {/* Results section header */}
-        <h2 className="text-lg font-semibold mb-4">
-          {hasSearched ? `Search Results (${results.length})` : 'Featured Tracks'}
-        </h2>
+        {/* Feed track browser - shows when browsing a specific feed/album */}
+        {browseFeed ? (
+          <FeedTrackBrowser
+            feed={browseFeed}
+            onSelectTrack={handleSelectTrack}
+            onBack={handleBackFromBrowser}
+            addedTrackIds={addedTracks}
+          />
+        ) : (
+          <>
+            {/* Results section header */}
+            <h2 className="text-lg font-semibold mb-4">
+              {hasSearched ? `Search Results (${results.length})` : 'Featured Music'}
+            </h2>
 
-        {/* Loading state */}
-        {(isSearching || isFeaturedLoading) && (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[1, 2, 3, 4, 5, 6].map((i) => (
-              <Card key={i}>
-                <Skeleton className="aspect-square" />
-                <CardContent className="p-4 space-y-2">
-                  <Skeleton className="h-5 w-3/4" />
-                  <Skeleton className="h-4 w-1/2" />
+            {/* Loading state */}
+            {(isSearching || isFeaturedLoading) && (
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {[1, 2, 3, 4, 5, 6].map((i) => (
+                  <Card key={i}>
+                    <Skeleton className="aspect-square" />
+                    <CardContent className="p-4 space-y-2">
+                      <Skeleton className="h-5 w-3/4" />
+                      <Skeleton className="h-4 w-1/2" />
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+
+            {/* Empty state */}
+            {!isSearching && !isFeaturedLoading && displayTracks.length === 0 && (
+              <Card className="border-dashed">
+                <CardContent className="py-12 text-center">
+                  <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
+                    <Music className="w-8 h-8 text-muted-foreground" />
+                  </div>
+                  <h3 className="font-semibold text-lg mb-2">
+                    {hasSearched ? 'No results found' : 'No music available'}
+                  </h3>
+                  <p className="text-muted-foreground text-sm mb-4">
+                    {hasSearched
+                      ? 'Try a different search term or switch sources'
+                      : 'Try searching for something specific'}
+                  </p>
+                  <Button variant="outline" onClick={toggleSource}>
+                    Switch to {source === 'podcastindex' ? 'Mock Data' : 'Podcast Index'}
+                  </Button>
                 </CardContent>
               </Card>
-            ))}
-          </div>
-        )}
+            )}
 
-        {/* Empty state */}
-        {!isSearching && !isFeaturedLoading && displayTracks.length === 0 && (
-          <Card className="border-dashed">
-            <CardContent className="py-12 text-center">
-              <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
-                <Music className="w-8 h-8 text-muted-foreground" />
-              </div>
-              <h3 className="font-semibold text-lg mb-2">
-                {hasSearched ? 'No results found' : 'No tracks available'}
-              </h3>
-              <p className="text-muted-foreground text-sm mb-4">
-                {hasSearched
-                  ? 'Try a different search term or switch sources'
-                  : 'Try searching for something specific'}
-              </p>
-              <Button variant="outline" onClick={toggleSource}>
-                Switch to {source === 'podcastindex' ? 'Mock Data' : 'Podcast Index'}
-              </Button>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Track grid */}
-        {!isSearching && !isFeaturedLoading && displayTracks.length > 0 && (
+            {/* Feed/Album grid */}
+            {!isSearching && !isFeaturedLoading && displayTracks.length > 0 && (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {displayTracks.map((track) => {
-              const isAdded = addedTracks.has(track.id);
-
+            {displayTracks.map((feed) => {
               return (
                 <Card
-                  key={track.id}
-                  className={`group overflow-hidden transition-all hover:shadow-lg cursor-pointer ${isAdded ? 'ring-2 ring-green-500' : ''}`}
-                  onClick={() => !isAdded && handleSelectTrack(track)}
+                  key={feed.id}
+                  className="group overflow-hidden transition-all hover:shadow-lg cursor-pointer"
+                  onClick={() => handleBrowseFeed(feed)}
                 >
                   {/* Artwork */}
                   <div className="relative aspect-square">
-                    {track.artworkUrl ? (
+                    {feed.artworkUrl ? (
                       <img
-                        src={track.artworkUrl}
-                        alt={track.title}
+                        src={feed.artworkUrl}
+                        alt={feed.title}
                         className="w-full h-full object-cover"
                       />
                     ) : (
@@ -390,22 +410,15 @@ export default function AddTrackToList() {
                     )}
 
                     {/* Overlay */}
-                    <div className={`absolute inset-0 flex items-center justify-center bg-black/40 transition-opacity ${isAdded ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
-                      {isAdded ? (
-                        <div className="flex items-center gap-2 text-white font-medium">
-                          <Check className="w-6 h-6" />
-                          Added
-                        </div>
-                      ) : (
-                        <Button variant="secondary" size="sm">
-                          <Plus className="w-4 h-4 mr-2" />
-                          Add to List
-                        </Button>
-                      )}
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/40 transition-opacity opacity-0 group-hover:opacity-100">
+                      <Button variant="secondary" size="sm">
+                        <Music className="w-4 h-4 mr-2" />
+                        Browse Tracks
+                      </Button>
                     </div>
 
                     {/* V4V badge */}
-                    {track.valueTag && (
+                    {feed.valueTag && (
                       <Badge className="absolute top-2 right-2 bg-amber-500 hover:bg-amber-600 gap-1">
                         V4V
                       </Badge>
@@ -413,13 +426,15 @@ export default function AddTrackToList() {
                   </div>
 
                   <CardContent className="p-4">
-                    <h3 className="font-semibold truncate">{track.title}</h3>
-                    <p className="text-sm text-muted-foreground truncate">{track.artist}</p>
+                    <h3 className="font-semibold truncate">{feed.title}</h3>
+                    <p className="text-sm text-muted-foreground truncate">{feed.artist}</p>
                   </CardContent>
                 </Card>
               );
             })}
           </div>
+        )}
+          </>
         )}
 
         {/* Add track dialog */}
