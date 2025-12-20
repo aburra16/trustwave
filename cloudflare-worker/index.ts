@@ -1,9 +1,9 @@
 /**
  * Cloudflare Worker proxy for Podcast Index API
- *
+ * 
  * This Worker handles authenticated requests to the Podcast Index API,
  * keeping the API secret secure and solving CORS issues.
- *
+ * 
  * Deploy instructions:
  * 1. npm create cloudflare@latest trustwave-pi-proxy
  * 2. cd trustwave-pi-proxy
@@ -15,186 +15,135 @@
 
 export default {
   async fetch(request: Request, env: { PODCASTINDEX_KEY: string; PODCASTINDEX_SECRET: string }) {
-    const url = new URL(request.url);
+    // 1. CORS Headers
+    const corsHeaders = {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, OPTIONS",
+      "Access-Control-Allow-Headers": "*",
+    };
 
-    // CORS preflight
     if (request.method === "OPTIONS") {
-      return new Response(null, {
-        status: 204,
-        headers: corsHeaders(request),
+      return new Response(null, { headers: corsHeaders });
+    }
+
+    // 2. Auth Check
+    const apiKey = (env.PODCASTINDEX_KEY || "").trim();
+    const apiSecret = (env.PODCASTINDEX_SECRET || "").trim();
+    if (!apiKey || !apiSecret) {
+      return new Response(JSON.stringify({ error: "Keys Missing" }), { 
+        status: 500, 
+        headers: { ...corsHeaders, "Content-Type": "application/json" } 
       });
     }
 
-    // Endpoint: /search?q=term&max=20&medium=music
-    if (url.pathname === "/search") {
-      const q = url.searchParams.get("q") ?? "";
-      const max = url.searchParams.get("max") ?? "20";
-      const medium = url.searchParams.get("medium") ?? ""; // music, podcast, video, film, audiobook, newsletter, blog
+    // 3. Generate Headers (The Handshake)
+    const apiHeaderTime = Math.floor(Date.now() / 1000);
+    const data4Hash = apiKey + apiSecret + apiHeaderTime;
+    const msgBuffer = new TextEncoder().encode(data4Hash);
+    const hashBuffer = await crypto.subtle.digest("SHA-1", msgBuffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 
-      if (!q.trim()) {
-        return json({ error: "Missing q parameter" }, 400, request);
+    const piHeaders = {
+      "User-Agent": "TrustWave/1.0",
+      "X-Auth-Key": apiKey,
+      "X-Auth-Date": apiHeaderTime.toString(),
+      "Authorization": hashHex,
+    };
+
+    // 4. Routing Logic
+    const url = new URL(request.url);
+    const path = url.pathname;
+    const params = url.searchParams;
+    
+    // Base API URL
+    const BASE_API = "https://api.podcastindex.org/api/1.0";
+    let targetUrl = "";
+
+    // SEARCH endpoint - supports music filtering
+    if (path === "/search" || path === "/") {
+      const q = params.get("q");
+      if (!q && path === "/search") {
+        return new Response(JSON.stringify({ error: "Missing 'q' param" }), { 
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400
+        });
+      }
+      
+      const medium = params.get("medium");
+      const max = params.get("max") || "20";
+
+      // Use the specific "Music" endpoint if medium is music
+      if (medium === "music") {
+        targetUrl = `${BASE_API}/search/music/byterm?q=${encodeURIComponent(q || "")}&max=${max}`;
+      } else {
+        targetUrl = `${BASE_API}/search/byterm?q=${encodeURIComponent(q || "")}&max=${max}`;
+      }
+    
+    // RECENT endpoint - for featured/trending content
+    } else if (path === "/recent") {
+      const medium = params.get("medium");
+      const max = params.get("max") || "20";
+      
+      // For music, use the music search endpoint with a broad query
+      // This gives us music feeds similar to a "trending" or "featured" list
+      if (medium === "music") {
+        targetUrl = `${BASE_API}/search/music/byterm?q=music&max=${max}`;
+      } else {
+        // For other media types, use recent feeds
+        targetUrl = `${BASE_API}/recent/feeds?max=${max}`;
       }
 
-      const apiTime = Math.floor(Date.now() / 1000).toString();
-      const authHash = await sha1Hex(env.PODCASTINDEX_KEY + env.PODCASTINDEX_SECRET + apiTime);
-
-      const upstream = new URL("https://api.podcastindex.org/api/1.0/search/byterm");
-      upstream.searchParams.set("q", q);
-      upstream.searchParams.set("max", max);
-
-      // Only add medium parameter if specified (for filtering by content type)
-      if (medium) {
-        upstream.searchParams.set("medium", medium);
+    // EPISODES BY FEED ID endpoint
+    } else if (path === "/episodes/byfeedid") {
+      const id = params.get("id");
+      const max = params.get("max") || "10";
+      
+      if (!id) {
+        return new Response(JSON.stringify({ error: "Missing 'id' param" }), { 
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400
+        });
       }
+      
+      targetUrl = `${BASE_API}/episodes/byfeedid?id=${id}&max=${max}`;
 
-      const resp = await fetch(upstream.toString(), {
-        headers: {
-          "X-Auth-Date": apiTime,
-          "X-Auth-Key": env.PODCASTINDEX_KEY,
-          "Authorization": authHash,
-          "User-Agent": "trustwave-proxy/1.0",
-        },
-      });
+    // EPISODE BY ID endpoint
+    } else if (path === "/episodes/byid") {
+      const id = params.get("id");
+      
+      if (!id) {
+        return new Response(JSON.stringify({ error: "Missing 'id' param" }), { 
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400
+        });
+      }
+      
+      targetUrl = `${BASE_API}/episodes/byid?id=${id}`;
 
-      const text = await resp.text();
-      return new Response(text, {
-        status: resp.status,
-        headers: {
-          "Content-Type": resp.headers.get("Content-Type") ?? "application/json",
-          ...corsHeaders(request),
-        },
+    } else {
+      return new Response(JSON.stringify({ error: "Endpoint not found" }), { 
+        status: 404, 
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
     }
 
-    // Endpoint: /recent?max=20&medium=music
-    if (url.pathname === "/recent") {
-      const max = url.searchParams.get("max") ?? "20";
-      const medium = url.searchParams.get("medium") ?? ""; // music, podcast, video, film, audiobook, newsletter, blog
-
-      const apiTime = Math.floor(Date.now() / 1000).toString();
-      const authHash = await sha1Hex(env.PODCASTINDEX_KEY + env.PODCASTINDEX_SECRET + apiTime);
-
-      const upstream = new URL("https://api.podcastindex.org/api/1.0/recent/episodes");
-      upstream.searchParams.set("max", max);
-      upstream.searchParams.set("lang", "en");
-
-      // Only add medium parameter if specified (for filtering by content type)
-      if (medium) {
-        upstream.searchParams.set("medium", medium);
-      }
-
-      const resp = await fetch(upstream.toString(), {
-        headers: {
-          "X-Auth-Date": apiTime,
-          "X-Auth-Key": env.PODCASTINDEX_KEY,
-          "Authorization": authHash,
-          "User-Agent": "trustwave-proxy/1.0",
-        },
+    // 5. Execute Request
+    try {
+      const response = await fetch(targetUrl, { headers: piHeaders });
+      const data = await response.text();
+      return new Response(data, {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: response.status
       });
-
-      const text = await resp.text();
-      return new Response(text, {
-        status: resp.status,
-        headers: {
-          "Content-Type": resp.headers.get("Content-Type") ?? "application/json",
-          ...corsHeaders(request),
-        },
+    } catch (err) {
+      return new Response(JSON.stringify({ 
+        error: "Proxy Fetch Failed", 
+        details: err instanceof Error ? err.message : String(err)
+      }), { 
+        status: 500, 
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
     }
-
-    // Endpoint: /episodes/byfeedid?id=123&max=10
-    if (url.pathname === "/episodes/byfeedid") {
-      const feedId = url.searchParams.get("id") ?? "";
-      const max = url.searchParams.get("max") ?? "10";
-
-      if (!feedId) {
-        return json({ error: "Missing id parameter" }, 400, request);
-      }
-
-      const apiTime = Math.floor(Date.now() / 1000).toString();
-      const authHash = await sha1Hex(env.PODCASTINDEX_KEY + env.PODCASTINDEX_SECRET + apiTime);
-
-      const upstream = new URL("https://api.podcastindex.org/api/1.0/episodes/byfeedid");
-      upstream.searchParams.set("id", feedId);
-      upstream.searchParams.set("max", max);
-
-      const resp = await fetch(upstream.toString(), {
-        headers: {
-          "X-Auth-Date": apiTime,
-          "X-Auth-Key": env.PODCASTINDEX_KEY,
-          "Authorization": authHash,
-          "User-Agent": "trustwave-proxy/1.0",
-        },
-      });
-
-      const text = await resp.text();
-      return new Response(text, {
-        status: resp.status,
-        headers: {
-          "Content-Type": resp.headers.get("Content-Type") ?? "application/json",
-          ...corsHeaders(request),
-        },
-      });
-    }
-
-    // Endpoint: /episodes/byid?id=123
-    if (url.pathname === "/episodes/byid") {
-      const episodeId = url.searchParams.get("id") ?? "";
-
-      if (!episodeId) {
-        return json({ error: "Missing id parameter" }, 400, request);
-      }
-
-      const apiTime = Math.floor(Date.now() / 1000).toString();
-      const authHash = await sha1Hex(env.PODCASTINDEX_KEY + env.PODCASTINDEX_SECRET + apiTime);
-
-      const upstream = new URL("https://api.podcastindex.org/api/1.0/episodes/byid");
-      upstream.searchParams.set("id", episodeId);
-
-      const resp = await fetch(upstream.toString(), {
-        headers: {
-          "X-Auth-Date": apiTime,
-          "X-Auth-Key": env.PODCASTINDEX_KEY,
-          "Authorization": authHash,
-          "User-Agent": "trustwave-proxy/1.0",
-        },
-      });
-
-      const text = await resp.text();
-      return new Response(text, {
-        status: resp.status,
-        headers: {
-          "Content-Type": resp.headers.get("Content-Type") ?? "application/json",
-          ...corsHeaders(request),
-        },
-      });
-    }
-
-    return json({ error: "Not found" }, 404, request);
   },
 };
-
-function corsHeaders(request: Request) {
-  const origin = request.headers.get("Origin") || "*";
-  // In production, replace "*" with your exact site origin(s)
-  // e.g., "https://trustwave.yourdomain.com"
-  return {
-    "Access-Control-Allow-Origin": origin,
-    "Vary": "Origin",
-    "Access-Control-Allow-Methods": "GET,OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
-  };
-}
-
-function json(obj: unknown, status: number, request: Request) {
-  return new Response(JSON.stringify(obj), {
-    status,
-    headers: { "Content-Type": "application/json", ...corsHeaders(request) },
-  });
-}
-
-async function sha1Hex(input: string) {
-  const data = new TextEncoder().encode(input);
-  const hashBuf = await crypto.subtle.digest("SHA-1", data);
-  return [...new Uint8Array(hashBuf)].map((b) => b.toString(16).padStart(2, "0")).join("");
-}
