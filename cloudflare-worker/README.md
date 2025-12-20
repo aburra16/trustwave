@@ -40,10 +40,10 @@ cp ../cloudflare-worker/index.ts src/index.ts
 
 # Add your secrets (NEVER commit these)
 npx wrangler secret put PODCASTINDEX_KEY
-# Enter: QR3MNNMGKTRHXAD9NKBL
+# Enter your Podcast Index API key when prompted
 
 npx wrangler secret put PODCASTINDEX_SECRET
-# Enter: #$LTq8HngFFLZ8bRMqU^wSukj5E6tEPe$RKbsaRR
+# Enter your Podcast Index API secret when prompted
 
 # Deploy
 npm run deploy
@@ -96,7 +96,12 @@ The worker requires two secrets (set via `wrangler secret put`):
 - `PODCASTINDEX_KEY` - Your Podcast Index API key
 - `PODCASTINDEX_SECRET` - Your Podcast Index API secret
 
-These are already configured for the TrustWave deployment. **Do not commit these values to git.**
+**Get your API credentials:**
+1. Visit https://podcastindex.org and create an account
+2. Go to your account settings to get your API key and secret
+3. Use `wrangler secret put` to add them to your worker (see deployment instructions above)
+
+**Important:** Never commit API keys to git. Use Wrangler secrets to keep them secure.
 
 ## CORS Configuration
 
