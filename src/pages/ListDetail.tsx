@@ -5,8 +5,8 @@
 import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useSeoMeta } from '@unhead/react';
-import { 
-  Play, Pause, Music, User, Hash, ArrowLeft, 
+import {
+  Play, Pause, Music, User, Hash, ArrowLeft,
   Globe, Users, Plus, Share, MoreHorizontal,
   Shuffle, Clock
 } from 'lucide-react';
@@ -38,7 +38,7 @@ export default function ListDetail() {
   const { user } = useCurrentUser();
   const { data: wot } = useWebOfTrust();
   const [filter, setFilter] = useState<TrustFilter>('trusted');
-  
+
   const { data: list, isLoading: listLoading } = useMusicList(listId);
   const { data: items, isLoading: itemsLoading } = useFilteredListItems(listId, filter);
   const author = useAuthor(list?.pubkey);
@@ -61,6 +61,9 @@ export default function ListDetail() {
     enclosureUrl: item.trackUrl,
     artworkUrl: item.event.tags.find(([k]) => k === 'artwork')?.[1],
     duration: parseInt(item.event.tags.find(([k]) => k === 'duration')?.[1] || '0') || undefined,
+    feedUrl: item.feedUrl,
+    guid: item.guid,
+    valueTag: item.valueTag ? JSON.parse(item.valueTag) : undefined,
   }));
 
   const handlePlayAll = () => {
@@ -144,7 +147,7 @@ export default function ListDetail() {
           <div className="flex-1">
             <div className="text-sm text-muted-foreground mb-1">Playlist</div>
             <h1 className="text-3xl md:text-4xl font-bold mb-2">{list.title}</h1>
-            
+
             {list.description && (
               <p className="text-muted-foreground mb-4 max-w-2xl">{list.description}</p>
             )}
@@ -163,14 +166,14 @@ export default function ListDetail() {
 
             {/* Creator and stats */}
             <div className="flex items-center gap-4 text-sm text-muted-foreground mb-6">
-              <Link 
+              <Link
                 to={`/profile/${list.pubkey}`}
                 className="flex items-center gap-2 hover:text-foreground"
               >
                 {author.data?.metadata?.picture ? (
-                  <img 
-                    src={author.data.metadata.picture} 
-                    alt="" 
+                  <img
+                    src={author.data.metadata.picture}
+                    alt=""
                     className="w-6 h-6 rounded-full object-cover"
                   />
                 ) : (
@@ -206,7 +209,7 @@ export default function ListDetail() {
                   </>
                 )}
               </Button>
-              
+
               <Button variant="outline" size="lg" onClick={handleShuffle} disabled={tracks.length === 0}>
                 <Shuffle className="w-5 h-5 mr-2" />
                 Shuffle
@@ -244,8 +247,8 @@ export default function ListDetail() {
             <div>
               <h3 className="font-medium">Trust Filter</h3>
               <p className="text-sm text-muted-foreground">
-                {effectiveFilter === 'trusted' 
-                  ? 'Showing tracks from people in your network' 
+                {effectiveFilter === 'trusted'
+                  ? 'Showing tracks from people in your network'
                   : 'Showing all tracks'}
               </p>
             </div>
@@ -292,8 +295,8 @@ export default function ListDetail() {
                 )}
               </div>
               <h3 className="font-semibold text-lg mb-2">
-                {effectiveFilter === 'trusted' 
-                  ? 'No tracks from your network' 
+                {effectiveFilter === 'trusted'
+                  ? 'No tracks from your network'
                   : 'No tracks yet'}
               </h3>
               <p className="text-muted-foreground text-sm max-w-sm mx-auto mb-4">
@@ -331,6 +334,8 @@ export default function ListDetail() {
                   enclosureUrl: item.trackUrl,
                   artworkUrl: item.event.tags.find(([k]) => k === 'artwork')?.[1],
                   duration: parseInt(item.event.tags.find(([k]) => k === 'duration')?.[1] || '0') || undefined,
+                  feedUrl: item.feedUrl,
+                  guid: item.guid,
                   valueTag: item.valueTag ? JSON.parse(item.valueTag) : undefined,
                 }}
                 listItem={item}
