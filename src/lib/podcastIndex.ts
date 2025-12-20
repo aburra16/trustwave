@@ -1,10 +1,11 @@
 /**
  * Podcast Index API integration via Cloudflare Worker proxy
- * 
- * The Worker handles authentication and CORS, and exposes a simple endpoint:
- * GET /?q=searchterm
- * 
- * This returns search results from Podcast Index's /search/byterm endpoint.
+ *
+ * The Worker handles authentication and CORS, and exposes endpoints:
+ * GET /search?q=searchterm&medium=music - Search for music content
+ * GET /recent?medium=music - Get recent music episodes
+ *
+ * This app filters for music content only using the 'medium' parameter.
  */
 
 import type { TrackMetadata, ValueTag, MusicSourceProvider } from './musicTypes';
@@ -56,7 +57,7 @@ interface PodcastIndexSearchResponse {
 }
 
 /**
- * Search for music/podcasts on Podcast Index via Worker proxy
+ * Search for music on Podcast Index via Worker proxy
  */
 export async function searchPodcastIndex(query: string): Promise<TrackMetadata[]> {
   if (!isProxyConfigured) {
@@ -66,9 +67,10 @@ export async function searchPodcastIndex(query: string): Promise<TrackMetadata[]
 
   try {
     const encodedQuery = encodeURIComponent(query);
-    const fetchUrl = `${PROXY_URL}?q=${encodedQuery}`;
-    console.log('🔍 Searching Podcast Index:', fetchUrl);
-    
+    // Use /search endpoint with medium=music to filter for music content only
+    const fetchUrl = `${PROXY_URL}/search?q=${encodedQuery}&max=60&medium=music`;
+    console.log('🔍 Searching Podcast Index for music:', fetchUrl);
+
     const response = await fetch(fetchUrl);
     console.log('📡 Response status:', response.status);
 
@@ -93,7 +95,7 @@ export async function searchPodcastIndex(query: string): Promise<TrackMetadata[]
     // Users can add the feed itself or we treat the feed as a "track"
     const tracks: TrackMetadata[] = data.feeds.map(feed => {
       let valueTag: ValueTag | undefined;
-      
+
       if (feed.value) {
         valueTag = {
           type: feed.value.model.type,
@@ -109,7 +111,7 @@ export async function searchPodcastIndex(query: string): Promise<TrackMetadata[]
           })),
         };
       }
-      
+
       return {
         id: String(feed.id),
         title: feed.title,
@@ -124,7 +126,7 @@ export async function searchPodcastIndex(query: string): Promise<TrackMetadata[]
         description: feed.description,
       };
     });
-    
+
     return tracks;
   } catch (error) {
     console.error('💥 Error searching Podcast Index:', error);
@@ -133,12 +135,83 @@ export async function searchPodcastIndex(query: string): Promise<TrackMetadata[]
 }
 
 /**
- * Get recent/featured music by searching for "music"
+ * Get recent/featured music from Podcast Index
  */
 export async function getRecentMusic(max = 20): Promise<TrackMetadata[]> {
-  console.log('🎵 Getting featured music...');
-  // Use a generic search to get featured content
-  return searchPodcastIndex('music');
+  if (!isProxyConfigured) {
+    console.warn('Podcast Index proxy not configured');
+    return [];
+  }
+
+  try {
+    // Use /recent endpoint with medium=music to get recent music episodes
+    const fetchUrl = `${PROXY_URL}/recent?max=${max}&medium=music`;
+    console.log('🎵 Getting featured music:', fetchUrl);
+
+    const response = await fetch(fetchUrl);
+    console.log('📡 Response status:', response.status);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ Featured music fetch failed:', response.status, errorText);
+      return [];
+    }
+
+    const data = await response.json();
+    console.log('✅ Received recent music data:', data);
+
+    if (data.status !== 'true' || !data.items) {
+      console.error('Invalid response format:', data);
+      return [];
+    }
+
+    console.log(`🎵 Found ${data.items.length} recent music episodes`);
+
+    // Convert episodes to TrackMetadata
+    // Group by feed to get unique music feeds
+    const feedMap = new Map<number, TrackMetadata>();
+
+    for (const item of data.items) {
+      if (!feedMap.has(item.feedId)) {
+        let valueTag: ValueTag | undefined;
+
+        if (item.value) {
+          valueTag = {
+            type: item.value.model.type,
+            method: item.value.model.method,
+            suggested: item.value.model.suggested,
+            recipients: item.value.destinations.map((dest: any) => ({
+              name: dest.name,
+              type: dest.type,
+              address: dest.address,
+              split: dest.split,
+              customKey: dest.customKey,
+              customValue: dest.customValue,
+            })),
+          };
+        }
+
+        feedMap.set(item.feedId, {
+          id: String(item.feedId),
+          title: item.feedTitle || item.title,
+          artist: item.feedAuthor || 'Unknown Artist',
+          album: item.feedTitle,
+          duration: item.duration,
+          enclosureUrl: item.feedUrl, // RSS feed URL
+          artworkUrl: item.feedImage || item.image,
+          feedUrl: item.feedUrl,
+          guid: String(item.feedId),
+          valueTag,
+          description: item.description,
+        });
+      }
+    }
+
+    return Array.from(feedMap.values()).slice(0, max);
+  } catch (error) {
+    console.error('💥 Error getting featured music:', error);
+    return [];
+  }
 }
 
 /**
@@ -161,15 +234,15 @@ export function isPodcastIndexAvailable(): boolean {
  */
 export const podcastIndexSource: MusicSourceProvider = {
   name: 'Podcast Index',
-  
+
   async search(query: string): Promise<TrackMetadata[]> {
     return searchPodcastIndex(query);
   },
-  
+
   async getTrack(id: string): Promise<TrackMetadata | null> {
     return getEpisodeById(id);
   },
-  
+
   async getFeatured(): Promise<TrackMetadata[]> {
     return getRecentMusic(12);
   },

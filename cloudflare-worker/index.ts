@@ -1,9 +1,9 @@
 /**
  * Cloudflare Worker proxy for Podcast Index API
- * 
+ *
  * This Worker handles authenticated requests to the Podcast Index API,
  * keeping the API secret secure and solving CORS issues.
- * 
+ *
  * Deploy instructions:
  * 1. npm create cloudflare@latest trustwave-pi-proxy
  * 2. cd trustwave-pi-proxy
@@ -25,11 +25,12 @@ export default {
       });
     }
 
-    // Endpoint: /search?q=term&max=20
+    // Endpoint: /search?q=term&max=20&medium=music
     if (url.pathname === "/search") {
       const q = url.searchParams.get("q") ?? "";
       const max = url.searchParams.get("max") ?? "20";
-      
+      const medium = url.searchParams.get("medium") ?? ""; // music, podcast, video, film, audiobook, newsletter, blog
+
       if (!q.trim()) {
         return json({ error: "Missing q parameter" }, 400, request);
       }
@@ -40,6 +41,11 @@ export default {
       const upstream = new URL("https://api.podcastindex.org/api/1.0/search/byterm");
       upstream.searchParams.set("q", q);
       upstream.searchParams.set("max", max);
+
+      // Only add medium parameter if specified (for filtering by content type)
+      if (medium) {
+        upstream.searchParams.set("medium", medium);
+      }
 
       const resp = await fetch(upstream.toString(), {
         headers: {
@@ -60,9 +66,10 @@ export default {
       });
     }
 
-    // Endpoint: /recent?max=20
+    // Endpoint: /recent?max=20&medium=music
     if (url.pathname === "/recent") {
       const max = url.searchParams.get("max") ?? "20";
+      const medium = url.searchParams.get("medium") ?? ""; // music, podcast, video, film, audiobook, newsletter, blog
 
       const apiTime = Math.floor(Date.now() / 1000).toString();
       const authHash = await sha1Hex(env.PODCASTINDEX_KEY + env.PODCASTINDEX_SECRET + apiTime);
@@ -70,6 +77,11 @@ export default {
       const upstream = new URL("https://api.podcastindex.org/api/1.0/recent/episodes");
       upstream.searchParams.set("max", max);
       upstream.searchParams.set("lang", "en");
+
+      // Only add medium parameter if specified (for filtering by content type)
+      if (medium) {
+        upstream.searchParams.set("medium", medium);
+      }
 
       const resp = await fetch(upstream.toString(), {
         headers: {
@@ -94,7 +106,7 @@ export default {
     if (url.pathname === "/episodes/byfeedid") {
       const feedId = url.searchParams.get("id") ?? "";
       const max = url.searchParams.get("max") ?? "10";
-      
+
       if (!feedId) {
         return json({ error: "Missing id parameter" }, 400, request);
       }
@@ -128,7 +140,7 @@ export default {
     // Endpoint: /episodes/byid?id=123
     if (url.pathname === "/episodes/byid") {
       const episodeId = url.searchParams.get("id") ?? "";
-      
+
       if (!episodeId) {
         return json({ error: "Missing id parameter" }, 400, request);
       }
