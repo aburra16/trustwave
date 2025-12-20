@@ -108,7 +108,15 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
       if (episode) {
         console.log('✅ Found episode:', episode.title);
-        setCurrentTrack(episode);
+        // Preserve the original feed's guid and feedUrl for track matching
+        const episodeWithFeedInfo = {
+          ...episode,
+          feedUrl: track.feedUrl,
+          // If the original track had a guid, preserve it for matching
+          guid: track.guid || episode.guid,
+        };
+
+        setCurrentTrack(episodeWithFeedInfo);
         setCurrentListItem(listItem || null);
 
         if (audioRef.current) {

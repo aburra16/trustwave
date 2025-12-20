@@ -116,9 +116,31 @@ export default function AddTrackToList() {
     if (!selectedTrack || !listId) return;
 
     try {
+      let trackToAdd = selectedTrack;
+
+      // For podcast feeds, fetch the first episode to get duration and other metadata
+      const isRSSFeed = selectedTrack.enclosureUrl.match(/\.(xml|rss)$/i) ||
+                       selectedTrack.enclosureUrl.includes('feed') ||
+                       !selectedTrack.enclosureUrl.match(/\.(mp3|m4a|ogg|wav)$/i);
+
+      if (isRSSFeed && selectedTrack.feedUrl) {
+        console.log('📻 Fetching episode details for duration...');
+        const { getFirstEpisodeFromFeed } = await import('@/lib/rssParser');
+        const episode = await getFirstEpisodeFromFeed(selectedTrack.feedUrl, selectedTrack);
+
+        if (episode && episode.duration) {
+          // Update the track with the episode's duration while keeping feed URL
+          trackToAdd = {
+            ...selectedTrack,
+            duration: episode.duration,
+          };
+          console.log('✅ Got episode duration:', episode.duration);
+        }
+      }
+
       await addTrack({
         listId,
-        track: selectedTrack,
+        track: trackToAdd,
         annotation: annotation.trim() || undefined,
       });
 

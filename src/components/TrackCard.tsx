@@ -33,16 +33,23 @@ function formatDuration(seconds: number): string {
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
-export function TrackCard({ 
-  track, 
-  listItem, 
-  onAddToList, 
+export function TrackCard({
+  track,
+  listItem,
+  onAddToList,
   showAddedBy = false,
-  compact = false 
+  compact = false
 }: TrackCardProps) {
   const { currentTrack, isPlaying, play, pause, resume } = usePlayer();
-  const isCurrentTrack = currentTrack?.enclosureUrl === track.enclosureUrl;
-  
+
+  // Check if this is the current track
+  // For podcast feeds, we need to check feedUrl since the enclosureUrl changes when resolved to an episode
+  const isCurrentTrack = currentTrack && (
+    currentTrack.enclosureUrl === track.enclosureUrl ||
+    (track.feedUrl && currentTrack.feedUrl === track.feedUrl) ||
+    (track.guid && currentTrack.guid === track.guid)
+  );
+
   // If we have a listItem, show who added it
   const author = useAuthor(listItem?.pubkey);
   const { isInWot, depth } = useIsInWot(listItem?.pubkey);
@@ -61,7 +68,7 @@ export function TrackCard({
 
   if (compact) {
     return (
-      <div 
+      <div
         className={cn(
           'flex items-center gap-3 p-2 rounded-lg transition-colors hover:bg-muted/50 group cursor-pointer',
           isCurrentTrack && 'bg-violet-50 dark:bg-violet-900/20'
@@ -133,7 +140,7 @@ export function TrackCard({
         ) : (
           <div className="w-full h-full bg-gradient-to-br from-violet-500 to-fuchsia-500" />
         )}
-        
+
         {/* Play overlay */}
         <div className={cn(
           'absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity',
@@ -167,7 +174,7 @@ export function TrackCard({
           <div className="min-w-0 flex-1">
             <h3 className="font-semibold truncate">{track.title}</h3>
             <p className="text-sm text-muted-foreground truncate">{track.artist}</p>
-            
+
             {track.duration && (
               <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
                 <Clock className="h-3 w-3" />
