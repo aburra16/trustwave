@@ -1,19 +1,15 @@
 /**
- * Podcast Index API integration
- * https://podcastindex-org.github.io/docs-api/
- *
- * This module uses a Cloudflare Worker proxy to make authenticated requests
- * to the Podcast Index API, solving CORS issues and keeping the API secret secure.
- *
- * Setup:
- * 1. Deploy the Cloudflare Worker from /cloudflare-worker/index.ts
- * 2. Set VITE_PI_PROXY_URL in your .env file
- * 3. If no proxy URL is set, the app falls back to mock data
+ * Podcast Index API integration via Cloudflare Worker proxy
+ * 
+ * The Worker handles authentication and CORS, and exposes a simple endpoint:
+ * GET /?q=searchterm
+ * 
+ * This returns search results from Podcast Index's /search/byterm endpoint.
  */
 
 import type { TrackMetadata, ValueTag, MusicSourceProvider } from './musicTypes';
 
-// Get proxy URL from environment variable or use hardcoded value
+// Cloudflare Worker proxy URL
 const PROXY_URL = import.meta.env.VITE_PI_PROXY_URL || 'https://trustwave-pi-proxy.malfactoryst.workers.dev';
 
 // Check if proxy is configured
@@ -22,66 +18,6 @@ const isProxyConfigured = Boolean(PROXY_URL);
 // Debug logging
 console.log('Podcast Index proxy URL:', PROXY_URL);
 console.log('Podcast Index available:', isProxyConfigured);
-
-interface PodcastIndexEpisode {
-  id: number;
-  title: string;
-  link: string;
-  description: string;
-  guid: string;
-  datePublished: number;
-  datePublishedPretty: string;
-  dateCrawled: number;
-  enclosureUrl: string;
-  enclosureType: string;
-  enclosureLength: number;
-  duration: number;
-  explicit: number;
-  episode: number;
-  episodeType: string;
-  season: number;
-  image: string;
-  feedItunesId: number;
-  feedImage: string;
-  feedId: number;
-  feedLanguage: string;
-  feedDead: number;
-  feedDuplicateOf: number;
-  chaptersUrl: string;
-  transcriptUrl: string;
-  soundbite: unknown;
-  soundbites: unknown[];
-  persons: unknown[];
-  socialInteract: unknown[];
-  value: PodcastIndexValue | null;
-  feedTitle?: string;
-  feedUrl?: string;
-}
-
-interface PodcastIndexValue {
-  model: {
-    type: string;
-    method: string;
-    suggested: string;
-  };
-  destinations: {
-    name: string;
-    type: string;
-    address: string;
-    split: number;
-    customKey?: string;
-    customValue?: string;
-  }[];
-}
-
-interface PodcastIndexSearchResponse {
-  status: string;
-  feeds?: PodcastIndexFeed[];
-  items?: PodcastIndexEpisode[];
-  count: number;
-  query?: string;
-  description: string;
-}
 
 interface PodcastIndexFeed {
   id: number;
@@ -93,185 +29,124 @@ interface PodcastIndexFeed {
   artwork: string;
   newestItemPublishTime: number;
   categories: Record<string, string>;
-  value?: PodcastIndexValue;
+  value?: {
+    model: {
+      type: string;
+      method: string;
+      suggested: string;
+    };
+    destinations: {
+      name: string;
+      type: string;
+      address: string;
+      split: number;
+      customKey?: string;
+      customValue?: string;
+    }[];
+  };
   episodeCount?: number;
 }
 
-interface PodcastIndexEpisodesResponse {
+interface PodcastIndexSearchResponse {
   status: string;
-  items: PodcastIndexEpisode[];
+  feeds: PodcastIndexFeed[];
   count: number;
+  query: string;
   description: string;
 }
 
 /**
- * Convert Podcast Index episode to our TrackMetadata format
- */
-function episodeToTrack(episode: PodcastIndexEpisode): TrackMetadata {
-  let valueTag: ValueTag | undefined;
-
-  if (episode.value) {
-    valueTag = {
-      type: episode.value.model.type,
-      method: episode.value.model.method,
-      suggested: episode.value.model.suggested,
-      recipients: episode.value.destinations.map(dest => ({
-        name: dest.name,
-        type: dest.type,
-        address: dest.address,
-        split: dest.split,
-        customKey: dest.customKey,
-        customValue: dest.customValue,
-      })),
-    };
-  }
-
-  return {
-    id: String(episode.id),
-    title: episode.title,
-    artist: episode.feedTitle || 'Unknown Artist',
-    album: episode.feedTitle,
-    duration: episode.duration,
-    enclosureUrl: episode.enclosureUrl,
-    artworkUrl: episode.image || episode.feedImage,
-    feedUrl: episode.feedUrl,
-    guid: episode.guid,
-    valueTag,
-    description: episode.description,
-  };
-}
-
-/**
- * Search for podcasts/music on Podcast Index via proxy
+ * Search for music/podcasts on Podcast Index via Worker proxy
  */
 export async function searchPodcastIndex(query: string): Promise<TrackMetadata[]> {
   if (!isProxyConfigured) {
-    console.warn('Podcast Index proxy not configured. Set VITE_PI_PROXY_URL in .env');
+    console.warn('Podcast Index proxy not configured');
     return [];
   }
 
   try {
     const encodedQuery = encodeURIComponent(query);
-    const response = await fetch(`${PROXY_URL}/search?q=${encodedQuery}&max=20`);
+    const fetchUrl = `${PROXY_URL}?q=${encodedQuery}`;
+    console.log('🔍 Searching Podcast Index:', fetchUrl);
+    
+    const response = await fetch(fetchUrl);
+    console.log('📡 Response status:', response.status);
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Podcast Index search failed:', response.status, errorText);
+      console.error('❌ Search failed:', response.status, errorText);
       return [];
     }
 
     const data: PodcastIndexSearchResponse = await response.json();
+    console.log('✅ Received data:', data);
 
-    if (data.status !== 'true') {
-      console.error('Podcast Index returned error status:', data);
+    if (data.status !== 'true' || !data.feeds) {
+      console.error('Invalid response format:', data);
       return [];
     }
 
-    // The search/byterm endpoint returns feeds
-    if (data.feeds && data.feeds.length > 0) {
-      // For each feed, get episodes
-      const validFeeds = data.feeds.filter(f => f.episodeCount && f.episodeCount > 0);
+    console.log(`📻 Found ${data.feeds.length} podcasts/feeds`);
 
-      // Try to get episodes for the first few feeds
-      const tracksPromises = validFeeds.slice(0, 5).map(async (feed) => {
-        try {
-          const episodesResponse = await fetch(`${PROXY_URL}/episodes/byfeedid?id=${feed.id}&max=3`);
-          if (episodesResponse.ok) {
-            const episodesData: PodcastIndexEpisodesResponse = await episodesResponse.json();
-            if (episodesData.status === 'true' && episodesData.items) {
-              return episodesData.items.map(ep => ({
-                ...episodeToTrack(ep),
-                artist: feed.author || feed.title,
-                artworkUrl: ep.image || ep.feedImage || feed.artwork || feed.image,
-              }));
-            }
-          }
-        } catch (e) {
-          console.warn('Failed to fetch episodes for feed:', feed.id);
-        }
-        return [];
-      });
-
-      const trackArrays = await Promise.all(tracksPromises);
-      return trackArrays.flat();
-    }
-
-    return [];
+    // Convert feeds to TrackMetadata
+    // Note: These are podcast feeds, not individual tracks
+    // Users can add the feed itself or we treat the feed as a "track"
+    const tracks: TrackMetadata[] = data.feeds.map(feed => {
+      let valueTag: ValueTag | undefined;
+      
+      if (feed.value) {
+        valueTag = {
+          type: feed.value.model.type,
+          method: feed.value.model.method,
+          suggested: feed.value.model.suggested,
+          recipients: feed.value.destinations.map(dest => ({
+            name: dest.name,
+            type: dest.type,
+            address: dest.address,
+            split: dest.split,
+            customKey: dest.customKey,
+            customValue: dest.customValue,
+          })),
+        };
+      }
+      
+      return {
+        id: String(feed.id),
+        title: feed.title,
+        artist: feed.author || 'Unknown Artist',
+        album: feed.title,
+        duration: undefined,
+        enclosureUrl: feed.url, // RSS feed URL
+        artworkUrl: feed.artwork || feed.image,
+        feedUrl: feed.url,
+        guid: String(feed.id),
+        valueTag,
+        description: feed.description,
+      };
+    });
+    
+    return tracks;
   } catch (error) {
-    console.error('Error searching Podcast Index:', error);
+    console.error('💥 Error searching Podcast Index:', error);
     return [];
   }
 }
 
 /**
- * Get recent episodes from Podcast Index via proxy
+ * Get recent/featured music by searching for "music"
  */
 export async function getRecentMusic(max = 20): Promise<TrackMetadata[]> {
-  if (!isProxyConfigured) {
-    console.warn('Podcast Index proxy not configured. Set VITE_PI_PROXY_URL in .env');
-    return [];
-  }
-
-  try {
-    const response = await fetch(`${PROXY_URL}/recent?max=${max}`);
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Podcast Index recent failed:', response.status, errorText);
-      return [];
-    }
-
-    const data: PodcastIndexEpisodesResponse = await response.json();
-
-    if (data.status !== 'true' || !data.items) {
-      return [];
-    }
-
-    // Filter to only episodes with valid audio URLs
-    const validEpisodes = data.items.filter(ep =>
-      ep.enclosureUrl &&
-      (ep.enclosureType?.includes('audio') || ep.enclosureUrl.match(/\.(mp3|m4a|ogg|wav)$/i))
-    );
-
-    return validEpisodes.map(episodeToTrack);
-  } catch (error) {
-    console.error('Error fetching recent from Podcast Index:', error);
-    return [];
-  }
+  console.log('🎵 Getting featured music...');
+  // Use a generic search to get featured content
+  return searchPodcastIndex('music');
 }
 
 /**
- * Get episode by ID via proxy
+ * Get a specific track (not supported by simple Worker)
  */
 export async function getEpisodeById(id: string): Promise<TrackMetadata | null> {
-  if (!isProxyConfigured) {
-    console.warn('Podcast Index proxy not configured. Set VITE_PI_PROXY_URL in .env');
-    return null;
-  }
-
-  try {
-    // Handle feed IDs (from search results)
-    if (id.startsWith('feed-')) {
-      return null;
-    }
-
-    const response = await fetch(`${PROXY_URL}/episodes/byid?id=${id}`);
-
-    if (!response.ok) {
-      return null;
-    }
-
-    const data = await response.json();
-
-    if (data.status !== 'true' || !data.episode) {
-      return null;
-    }
-
-    return episodeToTrack(data.episode);
-  } catch (error) {
-    console.error('Error fetching episode:', error);
-    return null;
-  }
+  console.warn('getEpisodeById not supported by simple Worker proxy');
+  return null;
 }
 
 /**
@@ -286,15 +161,15 @@ export function isPodcastIndexAvailable(): boolean {
  */
 export const podcastIndexSource: MusicSourceProvider = {
   name: 'Podcast Index',
-
+  
   async search(query: string): Promise<TrackMetadata[]> {
     return searchPodcastIndex(query);
   },
-
+  
   async getTrack(id: string): Promise<TrackMetadata | null> {
     return getEpisodeById(id);
   },
-
+  
   async getFeatured(): Promise<TrackMetadata[]> {
     return getRecentMusic(12);
   },
