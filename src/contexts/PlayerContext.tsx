@@ -4,6 +4,7 @@
 
 import { createContext, useContext, useRef, useState, useCallback, useEffect, type ReactNode } from 'react';
 import type { TrackMetadata, ListItem } from '@/lib/musicTypes';
+import { getFirstEpisodeFromFeed } from '@/lib/rssParser';
 
 interface PlayerContextValue {
   // Current state
@@ -13,11 +14,11 @@ interface PlayerContextValue {
   currentTime: number;
   duration: number;
   volume: number;
-  
+
   // Queue
   queue: TrackMetadata[];
   queueIndex: number;
-  
+
   // Actions
   play: (track: TrackMetadata, listItem?: ListItem) => void;
   pause: () => void;
@@ -35,7 +36,7 @@ const PlayerContext = createContext<PlayerContextValue | null>(null);
 
 export function PlayerProvider({ children }: { children: ReactNode }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  
+
   const [currentTrack, setCurrentTrack] = useState<TrackMetadata | null>(null);
   const [currentListItem, setCurrentListItem] = useState<ListItem | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -50,15 +51,15 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     if (!audioRef.current) {
       audioRef.current = new Audio();
       audioRef.current.volume = volume;
-      
+
       audioRef.current.addEventListener('timeupdate', () => {
         setCurrentTime(audioRef.current?.currentTime || 0);
       });
-      
+
       audioRef.current.addEventListener('loadedmetadata', () => {
         setDuration(audioRef.current?.duration || 0);
       });
-      
+
       audioRef.current.addEventListener('ended', () => {
         setIsPlaying(false);
         // Auto-play next in queue
@@ -66,11 +67,11 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
           setQueueIndex(prev => prev + 1);
         }
       });
-      
+
       audioRef.current.addEventListener('play', () => setIsPlaying(true));
       audioRef.current.addEventListener('pause', () => setIsPlaying(false));
     }
-    
+
     return () => {
       if (audioRef.current) {
         audioRef.current.pause();
@@ -93,10 +94,38 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     }
   }, [queueIndex, queue]);
 
-  const play = useCallback((track: TrackMetadata, listItem?: ListItem) => {
+  const play = useCallback(async (track: TrackMetadata, listItem?: ListItem) => {
+    // Check if the enclosureUrl is an RSS feed (not a direct audio file)
+    const isRSSFeed = track.enclosureUrl.match(/\.(xml|rss)$/i) ||
+                     track.enclosureUrl.includes('feed') ||
+                     !track.enclosureUrl.match(/\.(mp3|m4a|ogg|wav)$/i);
+
+    if (isRSSFeed && track.feedUrl) {
+      console.log('📻 This is a podcast feed, fetching first episode...');
+
+      // Fetch the first episode from the RSS feed
+      const episode = await getFirstEpisodeFromFeed(track.feedUrl, track);
+
+      if (episode) {
+        console.log('✅ Found episode:', episode.title);
+        setCurrentTrack(episode);
+        setCurrentListItem(listItem || null);
+
+        if (audioRef.current) {
+          audioRef.current.src = episode.enclosureUrl;
+          audioRef.current.play().catch(console.error);
+        }
+        return;
+      } else {
+        console.error('❌ Could not find playable episode in feed');
+        return;
+      }
+    }
+
+    // Direct audio file
     setCurrentTrack(track);
     setCurrentListItem(listItem || null);
-    
+
     if (audioRef.current) {
       audioRef.current.src = track.enclosureUrl;
       audioRef.current.play().catch(console.error);
