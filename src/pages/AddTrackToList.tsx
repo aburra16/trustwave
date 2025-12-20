@@ -48,8 +48,8 @@ export default function AddTrackToList() {
   const [isSearching, setIsSearching] = useState(false);
   const [isFeaturedLoading, setIsFeaturedLoading] = useState(true);
   const [hasSearched, setHasSearched] = useState(false);
-  // Default to mock data since Podcast Index requires a backend proxy for CORS
-  const [source, setSource] = useState<SourceType>('mock');
+  // Use Podcast Index if available, fallback to mock data
+  const [source, setSource] = useState<SourceType>(isPodcastIndexAvailable() ? 'podcastindex' : 'mock');
   const [error, setError] = useState<string | null>(null);
 
   // Feed browsing state

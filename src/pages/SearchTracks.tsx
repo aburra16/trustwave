@@ -35,8 +35,8 @@ export default function SearchTracks() {
   const [isFeaturedLoading, setIsFeaturedLoading] = useState(true);
   const [hasSearched, setHasSearched] = useState(false);
   const [selectedTrack, setSelectedTrack] = useState<TrackMetadata | null>(null);
-  // Default to mock data since Podcast Index requires a backend proxy for CORS
-  const [source, setSource] = useState<SourceType>('mock');
+  // Use Podcast Index if available, fallback to mock data
+  const [source, setSource] = useState<SourceType>(isPodcastIndexAvailable() ? 'podcastindex' : 'mock');
   const [error, setError] = useState<string | null>(null);
 
   // Load featured tracks on mount
