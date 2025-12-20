@@ -15,6 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { usePlayer } from '@/contexts/PlayerContext';
 import { useAuthor } from '@/hooks/useAuthor';
 import { useIsInWot } from '@/hooks/useWebOfTrust';
+import { useTrackDuration } from '@/hooks/useTrackDuration';
 import type { TrackMetadata, ListItem } from '@/lib/musicTypes';
 import { cn } from '@/lib/utils';
 import { genUserName } from '@/lib/genUserName';
@@ -49,6 +50,10 @@ export function TrackCard({
     (track.feedUrl && currentTrack.feedUrl === track.feedUrl) ||
     (track.guid && currentTrack.guid === track.guid)
   );
+
+  // Fetch duration for podcast tracks that don't have it stored
+  const { data: fetchedDuration } = useTrackDuration(track);
+  const duration = track.duration || fetchedDuration || undefined;
 
   // If we have a listItem, show who added it
   const author = useAuthor(listItem?.pubkey);
@@ -110,9 +115,9 @@ export function TrackCard({
         </div>
 
         {/* Duration */}
-        {track.duration && (
+        {duration && (
           <span className="text-xs text-muted-foreground">
-            {formatDuration(track.duration)}
+            {formatDuration(duration)}
           </span>
         )}
 
@@ -175,10 +180,10 @@ export function TrackCard({
             <h3 className="font-semibold truncate">{track.title}</h3>
             <p className="text-sm text-muted-foreground truncate">{track.artist}</p>
 
-            {track.duration && (
+            {duration && (
               <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
                 <Clock className="h-3 w-3" />
-                {formatDuration(track.duration)}
+                {formatDuration(duration)}
               </div>
             )}
           </div>

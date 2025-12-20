@@ -128,13 +128,17 @@ export default function AddTrackToList() {
         const { getFirstEpisodeFromFeed } = await import('@/lib/rssParser');
         const episode = await getFirstEpisodeFromFeed(selectedTrack.feedUrl, selectedTrack);
 
-        if (episode && episode.duration) {
+        console.log('📻 Episode fetched:', episode);
+
+        if (episode) {
           // Update the track with the episode's duration while keeping feed URL
           trackToAdd = {
             ...selectedTrack,
             duration: episode.duration,
           };
-          console.log('✅ Got episode duration:', episode.duration);
+          console.log('✅ Got episode duration:', episode.duration, 'seconds');
+        } else {
+          console.log('⚠️ No episode found in feed');
         }
       }
 

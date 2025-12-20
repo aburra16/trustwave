@@ -54,17 +54,22 @@ export default function ListDetail() {
   const isLoading = listLoading || itemsLoading;
 
   // Convert list items to track metadata for playback
-  const tracks: TrackMetadata[] = (items || []).map(item => ({
-    id: item.id,
-    title: item.title,
-    artist: item.artist,
-    enclosureUrl: item.trackUrl,
-    artworkUrl: item.event.tags.find(([k]) => k === 'artwork')?.[1],
-    duration: parseInt(item.event.tags.find(([k]) => k === 'duration')?.[1] || '0') || undefined,
-    feedUrl: item.feedUrl,
-    guid: item.guid,
-    valueTag: item.valueTag ? JSON.parse(item.valueTag) : undefined,
-  }));
+  const tracks: TrackMetadata[] = (items || []).map(item => {
+    const durationTag = item.event.tags.find(([k]) => k === 'duration')?.[1];
+    const duration = durationTag ? parseInt(durationTag) : undefined;
+
+    return {
+      id: item.id,
+      title: item.title,
+      artist: item.artist,
+      enclosureUrl: item.trackUrl,
+      artworkUrl: item.event.tags.find(([k]) => k === 'artwork')?.[1],
+      duration: duration && duration > 0 ? duration : undefined,
+      feedUrl: item.feedUrl,
+      guid: item.guid,
+      valueTag: item.valueTag ? JSON.parse(item.valueTag) : undefined,
+    };
+  });
 
   const handlePlayAll = () => {
     if (tracks.length > 0) {
@@ -324,25 +329,30 @@ export default function ListDetail() {
 
         {!itemsLoading && items && items.length > 0 && (
           <div className="space-y-1">
-            {items.map((item, index) => (
-              <TrackCard
-                key={item.id}
-                track={{
-                  id: item.id,
-                  title: item.title,
-                  artist: item.artist,
-                  enclosureUrl: item.trackUrl,
-                  artworkUrl: item.event.tags.find(([k]) => k === 'artwork')?.[1],
-                  duration: parseInt(item.event.tags.find(([k]) => k === 'duration')?.[1] || '0') || undefined,
-                  feedUrl: item.feedUrl,
-                  guid: item.guid,
-                  valueTag: item.valueTag ? JSON.parse(item.valueTag) : undefined,
-                }}
-                listItem={item}
-                showAddedBy={true}
-                compact={true}
-              />
-            ))}
+            {items.map((item, index) => {
+              const durationTag = item.event.tags.find(([k]) => k === 'duration')?.[1];
+              const duration = durationTag ? parseInt(durationTag) : undefined;
+
+              return (
+                <TrackCard
+                  key={item.id}
+                  track={{
+                    id: item.id,
+                    title: item.title,
+                    artist: item.artist,
+                    enclosureUrl: item.trackUrl,
+                    artworkUrl: item.event.tags.find(([k]) => k === 'artwork')?.[1],
+                    duration: duration && duration > 0 ? duration : undefined,
+                    feedUrl: item.feedUrl,
+                    guid: item.guid,
+                    valueTag: item.valueTag ? JSON.parse(item.valueTag) : undefined,
+                  }}
+                  listItem={item}
+                  showAddedBy={true}
+                  compact={true}
+                />
+              );
+            })}
           </div>
         )}
       </div>
