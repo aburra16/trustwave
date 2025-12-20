@@ -1,25 +1,45 @@
 # TrustWave - Music Discovery Through Trust
 
-A decentralized music discovery application built on Nostr that replaces opaque algorithms with a transparent Web-of-Trust.
+A decentralized music discovery application built on Nostr that replaces opaque algorithms with a transparent Web-of-Trust. Discover and curate music through collaborative playlists powered by social trust networks.
 
-## Architecture
+## 🎵 What is TrustWave?
+
+TrustWave is a music discovery platform where:
+- **Your network curates your music** - See tracks added by people you follow (Depth 0) and people they follow (Depth 1)
+- **Playlists are open and collaborative** - Anyone can add tracks to any playlist, creating community-driven music collections
+- **Discovery is transparent** - No black-box algorithms, just visible social connections
+- **Content is decentralized** - Music feeds are stored on RSS, playlist data on Nostr, all open and interoperable
+
+## ✨ Key Features
+
+### Music Discovery & Playback
+- 🎧 **Integrated Audio Player** - Stream music directly from RSS feeds with full playback controls
+- 🔍 **Smart Search** - Find music by artist, track, or genre via Podcast Index integration
+- 📀 **Album Browsing** - Browse full albums and select specific tracks to add
+- ⏱️ **Automatic Duration Fetching** - Track lengths displayed and cached automatically
+- ⚡ **V4V Support** - Value4Value enabled tracks with Lightning payment integration ready
+
+### Social & Trust Features
+- 👥 **Web-of-Trust Filtering** - Toggle between "All" (global) and "Trusted" (your network) views
+- 🌊 **Trust Depth Levels** - Filter by people you follow (Depth 0) or their follows (Depth 1)
+- 👤 **User Profiles** - See who added what tracks with trust depth indicators
+- 📝 **Track Annotations** - Curators can add notes explaining why they added a track
+
+### Playlist Management
+- 📋 **Open Playlists** - Create public playlists that anyone can contribute to
+- ➕ **Easy Track Addition** - Search, browse albums, select tracks, and add with optional annotations
+- 🎨 **Rich Metadata** - Playlists support titles, descriptions, images, and tags
+- 🔄 **Real-time Updates** - Playlist changes sync across the Nostr network instantly
+
+## 🏗️ Architecture
 
 TrustWave implements a 5-layer stack:
 
-1. **Distribution Layer** - RSS feeds and Podcast Index for music content
+1. **Distribution Layer** - RSS feeds and Podcast Index for music content (music-only filtering)
 2. **Identity Layer** - Nostr protocol for public keys and social interaction
-3. **Organization Layer** - Decentralized Lists (kind 9998/9999) for open playlists
+3. **Organization Layer** - Decentralized Lists (NIP-51: kinds 9998/9999) for open playlists
 4. **Curation Layer** - Web-of-Trust filtering (Depth 0 + Depth 1)
 5. **Presentation Layer** - React app with audio player and V4V payments
-
-## Features
-
-- **Trust-Based Discovery** - See only music added by people in your trust network
-- **Open Playlists** - Anyone can contribute tracks to community playlists
-- **Curator Tools** - Search and add tracks with annotations
-- **Web-of-Trust Filtering** - Toggle between Global and Trusted views
-- **Audio Player** - Stream music directly from RSS enclosures
-- **V4V Support** - Ready for Lightning zap integration
 
 ## Nostr Event Kinds
 
@@ -29,98 +49,67 @@ TrustWave implements a 5-layer stack:
 - **Kind 10040** - Trusted Service Providers (NIP-85)
 - **Kind 30382** - Trusted Assertions (NIP-85)
 
-## Podcast Index Integration
+## 🎵 Music Discovery with Podcast Index
 
-The app includes Podcast Index API integration, but due to security requirements, **the API requires a backend proxy** to keep the API secret secure.
+TrustWave uses Podcast Index as its primary music source, with **music-only filtering** to ensure you only see music content (no podcasts, audiobooks, or other media types).
 
-### Current State
-- **Mock data** is used by default with 10 sample V4V tracks
-- The Podcast Index integration code is ready and will automatically activate when you deploy the proxy
-- Cloudflare Worker code is included in `/cloudflare-worker/`
+### Two-Step Track Selection
 
-### Quick Setup (Recommended)
+The app uses an intelligent track selection flow:
 
-**Step 1**: Deploy the Cloudflare Worker proxy (keeps your API secret secure):
+1. **Search & Browse** - Search returns music feeds/albums
+2. **Select Tracks** - Click "Browse Tracks" to see all songs in an album
+3. **Add to Playlist** - Choose specific tracks to add with optional annotations
+
+This prevents accidentally adding entire albums when you only want one song!
+
+### Setup Requirements
+
+The Podcast Index integration requires a **Cloudflare Worker proxy** to keep API credentials secure. The worker is already configured with music-only filtering.
+
+**Quick Deployment:**
 
 ```bash
-# Create the Worker project
-npm create cloudflare@latest trustwave-pi-proxy
-
-# Choose "Hello World Worker" when prompted
+# Navigate to your worker directory (or create it)
 cd trustwave-pi-proxy
-npm install
 
-# Copy the Worker code
+# Copy the worker code
 cp ../cloudflare-worker/index.ts src/index.ts
 
-# Add your secrets (NEVER commit these)
+# Set your API credentials (never commit these!)
 npx wrangler secret put PODCASTINDEX_KEY
-# Enter: QR3MNNMGKTRHXAD9NKBL
-
 npx wrangler secret put PODCASTINDEX_SECRET
-# Enter: #$LTq8HngFFLZ8bRMqU^wSukj5E6tEPe$RKbsaRR
 
-# Deploy
+# Deploy to Cloudflare
 npm run deploy
 ```
 
-**Step 2**: Configure TrustWave to use your proxy:
+**Configure TrustWave:**
 
-Create `.env` file in the TrustWave project root:
+Create `.env` in project root:
 
 ```env
 VITE_PI_PROXY_URL=https://trustwave-pi-proxy.<your-subdomain>.workers.dev
 ```
 
-**Step 3**: Rebuild TrustWave:
+Then rebuild the app:
 
 ```bash
 npm run build
 ```
 
-That's it! The app will now use real Podcast Index data.
+See `/cloudflare-worker/README.md` for detailed setup instructions and endpoint documentation.
 
-### Alternative Options
+### Music-Only Filtering
 
-#### Option 1: Serverless Function
-Deploy a serverless function (Cloudflare Worker, Vercel Edge Function, etc.) that:
-1. Receives search queries from the browser
-2. Adds Podcast Index auth headers server-side
-3. Returns results to the browser
+The worker uses Podcast Index's `/search/music/byterm` endpoint to ensure only music content is returned:
+- ✅ Music albums and tracks
+- ✅ Music feeds with V4V support
+- ❌ Podcasts, audiobooks, and other media types filtered out
 
-Example Cloudflare Worker:
-```javascript
-export default {
-  async fetch(request) {
-    const url = new URL(request.url);
-    const query = url.searchParams.get('q');
+### Fallback Mode
 
-    const apiTime = Math.floor(Date.now() / 1000);
-    const hash = await sha1(API_KEY + API_SECRET + apiTime);
-
-    const response = await fetch(`https://api.podcastindex.org/api/1.0/search/byterm?q=${query}`, {
-      headers: {
-        'X-Auth-Date': apiTime,
-        'X-Auth-Key': API_KEY,
-        'Authorization': hash
-      }
-    });
-
-    return new Response(await response.text(), {
-      headers: { 'Access-Control-Allow-Origin': '*' }
-    });
-  }
-}
-```
-
-#### Option 2: Use a Third-Party V4V Music Directory
-Instead of Podcast Index, integrate with:
-- **Wavlake** - Bitcoin music platform with public API
-- **Fountain.fm** - V4V podcast/music directory
-- Other V4V-enabled music platforms
-
-#### Option 3: Backend Proxy Service
-Set up a simple Express/Node.js server that proxies Podcast Index requests.
+Without the proxy, the app uses mock data with 10 sample V4V tracks for testing and demonstration.
 
 ## Development
 
