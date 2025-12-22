@@ -36,7 +36,7 @@ export default function Index() {
         {!user && (
           <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-violet-600 via-fuchsia-600 to-pink-600 text-white p-8 md:p-12 mb-8">
             <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCA0MCA0MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4xIj48cGF0aCBkPSJNMCAwaDQwdjQwSDB6Ii8+PC9nPjwvZz48L3N2Zz4=')] opacity-20" />
-            
+
             <div className="relative z-10 max-w-2xl">
               <div className="flex items-center gap-2 mb-4">
                 <div className="w-10 h-10 rounded-lg bg-white/20 flex items-center justify-center">
@@ -44,15 +44,15 @@ export default function Index() {
                 </div>
                 <span className="text-lg font-semibold">TrustWave</span>
               </div>
-              
+
               <h1 className="text-3xl md:text-4xl font-bold mb-4">
                 Discover Music Through Your Web of Trust
               </h1>
               <p className="text-lg text-white/90 mb-6">
-                No algorithms. No ads. Just music curated by people you trust. 
+                No algorithms. No ads. Just music curated by people you trust.
                 Filter the noise and find your next favorite track through genuine social proof.
               </p>
-              
+
               <div className="flex flex-wrap gap-4">
                 <Button size="lg" variant="secondary" className="font-semibold">
                   Get Started
@@ -147,18 +147,12 @@ export default function Index() {
                     <Users className="w-4 h-4 text-violet-600" />
                     Your Trust Network
                   </h3>
-                  <div className="grid grid-cols-2 gap-4 text-center">
-                    <div>
-                      <p className="text-2xl font-bold text-violet-600">{wot.depth0.size}</p>
-                      <p className="text-xs text-muted-foreground">Following</p>
-                    </div>
-                    <div>
-                      <p className="text-2xl font-bold text-fuchsia-600">{wot.depth1.size}</p>
-                      <p className="text-xs text-muted-foreground">Extended</p>
-                    </div>
+                  <div className="text-center">
+                    <p className="text-3xl font-bold text-violet-600 mb-1">{wot.depth0.size}</p>
+                    <p className="text-sm text-muted-foreground">Following</p>
                   </div>
                   <p className="text-xs text-muted-foreground mt-3 text-center">
-                    Tracks from {wot.all.size} curators in your network
+                    See tracks from {wot.all.size} curators in your network
                   </p>
                 </CardContent>
               </Card>
