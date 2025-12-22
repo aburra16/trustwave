@@ -5,7 +5,7 @@ A decentralized music discovery application built on Nostr that replaces opaque 
 ## 🎵 What is TrustWave?
 
 TrustWave is a music discovery platform where:
-- **Your network curates your music** - See tracks added by people you follow (Depth 0) and people they follow (Depth 1)
+- **Your network curates your music** - See tracks added by people you follow
 - **Playlists are open and collaborative** - Anyone can add tracks to any playlist, creating community-driven music collections
 - **Discovery is transparent** - No black-box algorithms, just visible social connections
 - **Content is decentralized** - Music feeds are stored on RSS, playlist data on Nostr, all open and interoperable
@@ -21,8 +21,8 @@ TrustWave is a music discovery platform where:
 
 ### Social & Trust Features
 - 👥 **Web-of-Trust Filtering** - Toggle between "All" (global) and "Trusted" (your network) views
-- 🌊 **Trust Depth Levels** - Filter by people you follow (Depth 0) or their follows (Depth 1)
-- 👤 **User Profiles** - See who added what tracks with trust depth indicators
+- 🌊 **Fast Trust Network** - See only content from people you follow
+- 👤 **User Profiles** - See who added what tracks with follow indicators
 - 📝 **Track Annotations** - Curators can add notes explaining why they added a track
 
 ### Playlist Management
@@ -38,7 +38,7 @@ TrustWave implements a 5-layer stack:
 1. **Distribution Layer** - RSS feeds and Podcast Index for music content (music-only filtering)
 2. **Identity Layer** - Nostr protocol for public keys and social interaction
 3. **Organization Layer** - Decentralized Lists (NIP-51: kinds 9998/9999) for open playlists
-4. **Curation Layer** - Web-of-Trust filtering (Depth 0 + Depth 1)
+4. **Curation Layer** - Web-of-Trust filtering (people you follow)
 5. **Presentation Layer** - React app with audio player and V4V payments
 
 ## Nostr Event Kinds

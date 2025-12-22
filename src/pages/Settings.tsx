@@ -85,22 +85,18 @@ export default function Settings() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-3 gap-4 text-center">
+                <div className="grid grid-cols-2 gap-4 text-center max-w-md mx-auto">
                   <div className="p-4 rounded-lg bg-violet-50 dark:bg-violet-900/20">
                     <p className="text-2xl font-bold text-violet-600">{wot.depth0.size}</p>
                     <p className="text-sm text-muted-foreground">Following</p>
                   </div>
                   <div className="p-4 rounded-lg bg-fuchsia-50 dark:bg-fuchsia-900/20">
-                    <p className="text-2xl font-bold text-fuchsia-600">{wot.depth1.size}</p>
-                    <p className="text-sm text-muted-foreground">Extended (Depth 1)</p>
-                  </div>
-                  <div className="p-4 rounded-lg bg-pink-50 dark:bg-pink-900/20">
-                    <p className="text-2xl font-bold text-pink-600">{wot.all.size}</p>
+                    <p className="text-2xl font-bold text-fuchsia-600">{wot.all.size}</p>
                     <p className="text-sm text-muted-foreground">Total Network</p>
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground mt-4">
-                  Your trust network includes people you follow directly (Depth 0) and people they follow (Depth 1).
+                  Your trust network includes people you follow directly.
                   Content from these users will appear in your "Trusted" feed.
                 </p>
               </CardContent>
@@ -133,16 +129,16 @@ export default function Settings() {
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                TrustWave is a decentralized music discovery app that replaces opaque algorithms 
-                with a transparent Web-of-Trust. Discover music through people you trust, not 
+                TrustWave is a decentralized music discovery app that replaces opaque algorithms
+                with a transparent Web-of-Trust. Discover music through people you trust, not
                 through ads or paid placements.
               </p>
               <Separator />
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Built with</span>
-                <a 
-                  href="https://shakespeare.diy" 
-                  target="_blank" 
+                <a
+                  href="https://shakespeare.diy"
+                  target="_blank"
                   rel="noopener noreferrer"
                   className="text-violet-600 hover:underline"
                 >
