@@ -16,11 +16,11 @@ export function useListItems(listId: string | undefined) {
     queryKey: ['list-items', listId],
     queryFn: async (c) => {
       if (!listId) return [];
-      
-      const signal = AbortSignal.any([c.signal, AbortSignal.timeout(8000)]);
-      
+
+      const signal = AbortSignal.any([c.signal, AbortSignal.timeout(3000)]);
+
       const events = await nostr.query(
-        [{ kinds: [9999, 39999], '#z': [listId], limit: 200 }],
+        [{ kinds: [9999, 39999], '#z': [listId], limit: 100 }],
         { signal }
       );
 
@@ -36,7 +36,7 @@ export function useListItems(listId: string | undefined) {
       return items.sort((a, b) => b.createdAt - a.createdAt);
     },
     enabled: !!listId,
-    staleTime: 30000,
+    staleTime: 60000, // 1 minute
   });
 }
 
@@ -57,7 +57,7 @@ export function useFilteredListItems(listId: string | undefined, filter: TrustFi
 
   // Filter by Web-of-Trust
   const filtered = items.filter(item => wot.all.has(item.pubkey));
-  
+
   return { data: filtered, isLoading };
 }
 
@@ -69,7 +69,7 @@ export function useRecentListItems(limit = 50) {
     queryKey: ['recent-list-items', limit],
     queryFn: async (c) => {
       const signal = AbortSignal.any([c.signal, AbortSignal.timeout(8000)]);
-      
+
       const events = await nostr.query(
         [{ kinds: [9999, 39999], limit }],
         { signal }
@@ -98,9 +98,9 @@ export function useTrustedListItems(limit = 50) {
     queryKey: ['trusted-list-items', limit, wot ? Array.from(wot.all).sort().join(',') : ''],
     queryFn: async (c) => {
       if (!wot || wot.all.size === 0) return [];
-      
+
       const signal = AbortSignal.any([c.signal, AbortSignal.timeout(8000)]);
-      
+
       // Query for items from trusted users
       const trustedPubkeys = Array.from(wot.all);
       const batchSize = 100;
@@ -108,7 +108,7 @@ export function useTrustedListItems(limit = 50) {
 
       for (let i = 0; i < trustedPubkeys.length; i += batchSize) {
         const batch = trustedPubkeys.slice(i, i + batchSize);
-        
+
         try {
           const events = await nostr.query(
             [{ kinds: [9999, 39999], authors: batch, limit: Math.min(limit, 100) }],
@@ -144,9 +144,9 @@ export function useListItemsByAuthor(pubkey: string | undefined) {
     queryKey: ['list-items-by-author', pubkey],
     queryFn: async (c) => {
       if (!pubkey) return [];
-      
+
       const signal = AbortSignal.any([c.signal, AbortSignal.timeout(5000)]);
-      
+
       const events = await nostr.query(
         [{ kinds: [9999, 39999], authors: [pubkey], limit: 100 }],
         { signal }

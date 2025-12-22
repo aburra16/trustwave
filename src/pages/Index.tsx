@@ -24,7 +24,7 @@ export default function Index() {
 
   const { user } = useCurrentUser();
   const { data: wot, isLoading: wotLoading } = useWebOfTrust();
-  const { data: lists, isLoading: listsLoading } = useMusicLists(12);
+  const { data: lists, isLoading: listsLoading } = useMusicLists(8);
 
   // Show onboarding if user is logged in but has no follows
   const showOnboarding = user && !wotLoading && wot && wot.depth0.size === 0;
